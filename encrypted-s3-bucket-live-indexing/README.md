@@ -17,24 +17,14 @@ This configuration will create several objects:
 # Minimal Usage
 
 ```
-provider "aws" {
-  alias = "us-east-1"
-  region  = "us-east-1"
-  version = "~> 2.10"
-}
 
 
 module "s3_customer_buckets" {
   source = "git::https://github.com/ChaosSearch/terraform-modules.git//encrypted-s3-bucket-live-indexing"
 
-  region = "us-east-1"
+  region         = "us-east-1"
   cs_external_id = "YOUR_EXTERNAL_ID"
   cs_data_bucket = "NAME_FOR_YOUR_NEW_BUCKET"
-  sqs_queue = true
-
-  providers = {
-    aws = "aws.us-east-1"
-  }
 }
 ```
 

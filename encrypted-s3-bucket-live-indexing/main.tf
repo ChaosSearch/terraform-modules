@@ -1,11 +1,9 @@
-##
-## Remote state us-east-1
-##
+locals {
+  name = "${var.cs_data_bucket}-${var.region}"
+}
 
 resource "aws_s3_bucket" "cs_data_bucket" {
-  provider = "aws.us-east-1"
-
-  bucket = "${var.cs_data_bucket}-${var.region}"
+  bucket = local.name
   acl    = "private"
 
   force_destroy = false
@@ -13,7 +11,7 @@ resource "aws_s3_bucket" "cs_data_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        kms_master_key_id = "${aws_kms_key.cs_data_bucket_key.arn}"
+        kms_master_key_id = aws_kms_key.cs_data_bucket_key.arn
         sse_algorithm     = "aws:kms"
       }
     }
@@ -39,32 +37,36 @@ resource "aws_s3_bucket" "cs_data_bucket" {
     }
   }
 
-  tags {
-    Name     = "${var.cs_data_bucket}-${var.region}"
+  tags = {
+    Name = local.name
   }
 }
 
 resource "aws_sqs_queue" "cs_s3_bucket_sqs" {
-  count = "${var.sqs_queue ? 1 : 0}"
+  count = var.sqs_queue ? 1 : 0
 
-  provider = "aws.us-east-1"
-
-  name                      = "s3-sqs-${var.cs_data_bucket}-${var.region}"
-  max_message_size          = 2048
-  message_retention_seconds = 86400
-  visibility_timeout_seconds = 480
+  name                       = "s3-sqs-${local.name}"
+  max_message_size           = 2048
+  message_retention_seconds  = 86400
+  visibility_timeout_seconds = 600
 
   tags = {
-    Bucket = "${var.cs_data_bucket}-${var.region}"
+    Bucket = local.name
   }
 }
 
+# Wait for sqs queue to come up before attaching policy
+resource "time_sleep" "wait_1_minute" {
+  depends_on = [aws_sqs_queue.cs_s3_bucket_sqs]
+
+  create_duration = "60s"
+}
+
 resource "aws_sqs_queue_policy" "cs_s3_bucket_sqs" {
-  count = "${var.sqs_queue ? 1 : 0}"
+  count = var.sqs_queue ? 1 : 0
+  depends_on = [time_sleep.wait_1_minute]
 
-  provider = "aws.us-east-1"
-
-  queue_url = "${aws_sqs_queue.cs_s3_bucket_sqs.id}"
+  queue_url = aws_sqs_queue.cs_s3_bucket_sqs[0].id
 
   policy = <<POLICY
 {
@@ -74,7 +76,7 @@ resource "aws_sqs_queue_policy" "cs_s3_bucket_sqs" {
       "Effect": "Allow",
       "Principal": "*",
       "Action": "sqs:SendMessage",
-      "Resource": "${aws_sqs_queue.cs_s3_bucket_sqs.arn}",
+      "Resource": "${aws_sqs_queue.cs_s3_bucket_sqs[0].arn}",
       "Condition": {
         "ArnEquals": { "aws:SourceArn": "${aws_s3_bucket.cs_data_bucket.arn}" }
       }
@@ -85,7 +87,7 @@ resource "aws_sqs_queue_policy" "cs_s3_bucket_sqs" {
         "AWS": [ "${aws_iam_role.cs_logging_server_side_role.arn}" ]
       },
       "Action": "sqs:*",
-      "Resource": "${aws_sqs_queue.cs_s3_bucket_sqs.arn}"
+      "Resource": "${aws_sqs_queue.cs_s3_bucket_sqs[0].arn}"
     }
   ]
 }
@@ -93,31 +95,25 @@ POLICY
 }
 
 resource "aws_s3_bucket_notification" "cs_data_bucket_notification" {
-  count = "${var.sqs_queue ? 1 : 0}"
-  depends_on = ["aws_sqs_queue_policy.cs_s3_bucket_sqs"]
+  count = var.sqs_queue ? 1 : 0
+  depends_on = [aws_sqs_queue_policy.cs_s3_bucket_sqs[0]]
 
-  provider = "aws.us-east-1"
-
-  bucket = "${aws_s3_bucket.cs_data_bucket.id}"
+  bucket = aws_s3_bucket.cs_data_bucket.id
 
   queue {
-    queue_arn = "${aws_sqs_queue.cs_s3_bucket_sqs.arn}"
+    queue_arn = aws_sqs_queue.cs_s3_bucket_sqs[0].arn
     events    = ["s3:ObjectCreated:*"]
   }
 }
 
 resource "aws_kms_key" "cs_data_bucket_key" {
-  provider = "aws.us-east-1"
-
-  description             = "This key is used to encrypt ${var.cs_data_bucket}-${var.region}"
+  description             = "This key is used to encrypt ${local.name}"
   deletion_window_in_days = 10
 }
 
 resource "aws_kms_alias" "cs_data_bucket_key" {
-  provider = "aws.us-east-1"
-
-  name          = "alias/cs_${var.cs_data_bucket}_${var.region}"
-  target_key_id = "${aws_kms_key.cs_data_bucket_key.key_id}"
+  name          = "alias/cs_${local.name}"
+  target_key_id = aws_kms_key.cs_data_bucket_key.key_id
 }
 
 
@@ -126,9 +122,7 @@ resource "aws_kms_alias" "cs_data_bucket_key" {
 ##
 
 resource "aws_iam_role" "cs_logging_server_side_role" {
-  provider = "aws.us-east-1"
-
-  name = "cs_logging_server_side_role"
+  name = "cs_logging_server_side_${local.name}"
 
   assume_role_policy = <<EOF
 {
@@ -158,16 +152,12 @@ EOF
 }
 
 resource "aws_iam_role_policy_attachment" "cs_logging_server_side_role_policy_attach" {
-  provider = "aws.us-east-1"
-
-  role       = "${aws_iam_role.cs_logging_server_side_role.name}"
-  policy_arn = "${aws_iam_policy.cs_logging_server_side_role_policy.arn}"
+  role       = aws_iam_role.cs_logging_server_side_role.name
+  policy_arn = aws_iam_policy.cs_logging_server_side_role_policy.arn
 }
 
 resource "aws_iam_policy" "cs_logging_server_side_role_policy" {
-  provider = "aws.us-east-1"
-
-  name = "cs_logging_server_side_role_policy"
+  name = "cs_logging_server_side_${local.name}"
 
   #aws:userid
   policy = <<EOF
@@ -195,14 +185,14 @@ resource "aws_iam_policy" "cs_logging_server_side_role_policy" {
     },
     {
       "Effect": "Allow",
-      "Action": "*",
+      "Action": "s3:*",
       "Resource": [
         "arn:aws:s3:::cs-${var.cs_external_id}"
       ]
     },
     {
       "Effect": "Allow",
-      "Action": "*",
+      "Action": "s3:*",
       "Resource":
         [
           "arn:aws:s3:::cs-${var.cs_external_id}/*"
