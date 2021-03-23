@@ -1,9 +1,3 @@
-variable "region" {
-  description = "Default region"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "cs_external_id" {
   description = "chaossearch.io - String: External id (customer id) for bucket creations and assume role"
   type        = string

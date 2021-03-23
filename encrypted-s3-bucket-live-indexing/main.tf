@@ -1,5 +1,5 @@
 locals {
-  name = "${var.cs_data_bucket}-${var.region}"
+  name = "${var.cs_data_bucket}"
 }
 
 resource "aws_s3_bucket" "cs_data_bucket" {
@@ -22,19 +22,8 @@ resource "aws_s3_bucket" "cs_data_bucket" {
   }
 
   lifecycle_rule {
-    id      = "cleanup_after_30_days"
+    id      = "abort_incomplete_multipart"
     enabled = true
-
-    abort_incomplete_multipart_upload_days = 7
-
-    transition {
-      days          = 30
-      storage_class = "GLACIER"
-    }
-
-    expiration {
-      days = 31
-    }
   }
 
   tags = {
@@ -127,13 +116,7 @@ resource "aws_iam_role" "cs_logging_server_side_role" {
   assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
-  "Statement": [{
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Effect": "Allow"
-    },
+  "Statement": [
     {
       "Action": "sts:AssumeRole",
       "Principal": {
