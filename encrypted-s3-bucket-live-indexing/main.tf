@@ -124,12 +124,13 @@ resource "aws_iam_role" "cs_logging_server_side_role" {
 
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
-    "Statement" : [{
-      "Action" : "sts:AssumeRole",
-      "Principal" : {
-        "Service" : "ec2.amazonaws.com"
-      },
-      "Effect" : "Allow"
+    "Statement" : [
+      {
+        "Action" : "sts:AssumeRole",
+        "Principal" : {
+          "Service" : "ec2.amazonaws.com"
+        },
+        "Effect" : "Allow"
       },
       {
         "Action" : "sts:AssumeRole",
@@ -193,9 +194,7 @@ resource "aws_iam_policy" "cs_logging_server_side_role_policy" {
           "kms:Decrypt"
         ],
         "Effect" : "Allow",
-        "Resource" : [
-          aws_kms_key.cs_data_bucket_key.arn
-        ]
+        "Resource" : [aws_kms_key.cs_data_bucket_key.arn]
       }
     ]
   })
