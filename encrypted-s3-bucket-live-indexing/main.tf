@@ -75,18 +75,18 @@ resource "aws_sqs_queue_policy" "cs_s3_bucket_sqs" {
         "Effect" : "Allow",
         "Principal" : "*",
         "Action" : "sqs:SendMessage",
-        "Resource" : "${aws_sqs_queue.cs_s3_bucket_sqs[0].arn}",
+        "Resource" : aws_sqs_queue.cs_s3_bucket_sqs[0].arn,
         "Condition" : {
-          "ArnEquals" : { "aws:SourceArn" : "${aws_s3_bucket.cs_data_bucket.arn}" }
+          "ArnEquals" : { "aws:SourceArn" : aws_s3_bucket.cs_data_bucket.arn }
         }
       },
       {
         "Effect" : "Allow",
         "Principal" : {
-          "AWS" : ["${aws_iam_role.cs_logging_server_side_role.arn}"]
+          "AWS" : [aws_iam_role.cs_logging_server_side_role.arn]
         },
         "Action" : "sqs:*",
-        "Resource" : "${aws_sqs_queue.cs_s3_bucket_sqs[0].arn}"
+        "Resource" : aws_sqs_queue.cs_s3_bucket_sqs[0].arn
       }
     ]
   })
@@ -139,7 +139,7 @@ resource "aws_iam_role" "cs_logging_server_side_role" {
         "Effect" : "Allow",
         "Condition" : {
           "StringEquals" : {
-            "sts:ExternalId" : "${var.cs_external_id}"
+            "sts:ExternalId" : var.cs_external_id
           }
         }
       }
