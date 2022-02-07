@@ -168,23 +168,28 @@ resource "aws_iam_policy" "cs_logging_server_side_role_policy" {
           "s3:PutObjectTagging"
         ],
         "Resource" : [
-          aws_s3_bucket.cs_data_bucket.arn,
+          "${aws_s3_bucket.cs_data_bucket.arn}",
           "${aws_s3_bucket.cs_data_bucket.arn}/*"
         ]
       },
       {
         "Effect" : "Allow",
         "Action" : [
-          "s3:ListAllMyBuckets",
-          "s3:GetBucketLocation"
+          "s3:ListAllMyBuckets"
         ],
         "Resource" : "*"
       },
       {
         "Effect" : "Allow",
-        "Action" : "*",
+        "Action" : "s3:*",
         "Resource" : [
-          "arn:aws:s3:::cs-${var.cs_external_id}",
+          "arn:aws:s3:::cs-${var.cs_external_id}"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : "s3:*",
+        "Resource" : [
           "arn:aws:s3:::cs-${var.cs_external_id}/*"
         ]
       },
@@ -194,7 +199,9 @@ resource "aws_iam_policy" "cs_logging_server_side_role_policy" {
           "kms:Decrypt"
         ],
         "Effect" : "Allow",
-        "Resource" : [aws_kms_key.cs_data_bucket_key.arn]
+        "Resource" : [
+          "${aws_kms_key.cs_data_bucket_key.arn}"
+        ]
       }
     ]
   })
