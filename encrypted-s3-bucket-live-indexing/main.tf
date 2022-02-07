@@ -63,39 +63,37 @@ resource "time_sleep" "wait_1_minute" {
 }
 
 resource "aws_sqs_queue_policy" "cs_s3_bucket_sqs" {
-  count = var.sqs_queue ? 1 : 0
+  count      = var.sqs_queue ? 1 : 0
   depends_on = [time_sleep.wait_1_minute]
 
   queue_url = aws_sqs_queue.cs_s3_bucket_sqs[0].id
 
-  policy = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "sqs:SendMessage",
-      "Resource": "${aws_sqs_queue.cs_s3_bucket_sqs[0].arn}",
-      "Condition": {
-        "ArnEquals": { "aws:SourceArn": "${aws_s3_bucket.cs_data_bucket.arn}" }
-      }
-    },
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": [ "${aws_iam_role.cs_logging_server_side_role.arn}" ]
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Principal" : "*",
+        "Action" : "sqs:SendMessage",
+        "Resource" : aws_sqs_queue.cs_s3_bucket_sqs[0].arn,
+        "Condition" : {
+          "ArnEquals" : { "aws:SourceArn" : aws_s3_bucket.cs_data_bucket.arn }
+        }
       },
-      "Action": "sqs:*",
-      "Resource": "${aws_sqs_queue.cs_s3_bucket_sqs[0].arn}"
-    }
-  ]
-}
-POLICY
+      {
+        "Effect" : "Allow",
+        "Principal" : {
+          "AWS" : [aws_iam_role.cs_logging_server_side_role.arn]
+        },
+        "Action" : "sqs:*",
+        "Resource" : aws_sqs_queue.cs_s3_bucket_sqs[0].arn
+      }
+    ]
+  })
 }
 
 resource "aws_s3_bucket_notification" "cs_data_bucket_notification" {
-  count = var.sqs_queue ? 1 : 0
+  count      = var.sqs_queue ? 1 : 0
   depends_on = [aws_sqs_queue_policy.cs_s3_bucket_sqs[0]]
 
   bucket = aws_s3_bucket.cs_data_bucket.id
@@ -124,31 +122,30 @@ resource "aws_kms_alias" "cs_data_bucket_key" {
 resource "aws_iam_role" "cs_logging_server_side_role" {
   name = "cs_logging_server_side_${local.name}"
 
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
+  assume_role_policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Action" : "sts:AssumeRole",
+        "Principal" : {
+          "Service" : "ec2.amazonaws.com"
+        },
+        "Effect" : "Allow"
       },
-      "Effect": "Allow"
-    },
-    {
-      "Action": "sts:AssumeRole",
-      "Principal": {
-        "AWS": "arn:aws:iam::515570774723:root"
-      },
-      "Effect": "Allow",
-      "Condition": {
-        "StringEquals": {
-          "sts:ExternalId": "${var.cs_external_id}"
+      {
+        "Action" : "sts:AssumeRole",
+        "Principal" : {
+          "AWS" : "arn:aws:iam::515570774723:root"
+        },
+        "Effect" : "Allow",
+        "Condition" : {
+          "StringEquals" : {
+            "sts:ExternalId" : var.cs_external_id
+          }
         }
       }
-    }
-  ]
-}
-EOF
+    ]
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "cs_logging_server_side_role_policy_attach" {
@@ -160,55 +157,52 @@ resource "aws_iam_policy" "cs_logging_server_side_role_policy" {
   name = "cs_logging_server_side_${local.name}"
 
   #aws:userid
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:Get*",
-        "s3:List*",
-        "s3:PutObjectTagging"
-      ],
-      "Resource": [
-        "${aws_s3_bucket.cs_data_bucket.arn}",
-        "${aws_s3_bucket.cs_data_bucket.arn}/*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:ListAllMyBuckets"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "s3:*",
-      "Resource": [
-        "arn:aws:s3:::cs-${var.cs_external_id}"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": "s3:*",
-      "Resource":
-        [
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "s3:Get*",
+          "s3:List*",
+          "s3:PutObjectTagging"
+        ],
+        "Resource" : [
+          "${aws_s3_bucket.cs_data_bucket.arn}",
+          "${aws_s3_bucket.cs_data_bucket.arn}/*"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "s3:ListAllMyBuckets"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : "s3:*",
+        "Resource" : [
+          "arn:aws:s3:::cs-${var.cs_external_id}"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : "s3:*",
+        "Resource" : [
           "arn:aws:s3:::cs-${var.cs_external_id}/*"
         ]
-    },
-    {
-      "Action": [
+      },
+      {
+        "Action" : [
           "kms:GenerateDataKey",
           "kms:Decrypt"
-      ],
-      "Effect": "Allow",
-      "Resource": [
-        "${aws_kms_key.cs_data_bucket_key.arn}"
-      ]
-    }
-  ]
-}
-EOF
+        ],
+        "Effect" : "Allow",
+        "Resource" : [
+          "${aws_kms_key.cs_data_bucket_key.arn}"
+        ]
+      }
+    ]
+  })
 }
